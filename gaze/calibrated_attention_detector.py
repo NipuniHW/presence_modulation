@@ -1,4 +1,4 @@
-from attention_detector import AttentionDetector
+from .attention_detector import AttentionDetector
 
 class CalibratedAttentionDetector(AttentionDetector):
     def __init__(self, calibrator, attention_threshold=0.5, history_size=10):

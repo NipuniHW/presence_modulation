@@ -2,7 +2,7 @@ from multiprocessing import Queue
 
 from sensors import camera
 
-from gaze import calibrator
+from gaze import gaze_detector
 
 # global q_table
 
@@ -16,16 +16,14 @@ from gaze import calibrator
 if __name__ == "__main__":
     
     image_queue = Queue()
+    gaze_queue = Queue()
     
     camera_driver = camera.Camera(image_queue)
     camera_driver.start()
     
-    calibrator_unit = calibrator.Calibrator(image_queue)
+    gaze = gaze_detector.GazeDetector(image_queue, gaze_queue)
+    gaze.start()
     
-    calibrator_unit.calibrate()
-    
-    if not calibrator_unit.is_calibrated:
-        print("Calibration failed or was interrupted.")
     
     
     
