@@ -9,9 +9,14 @@ class Camera(Process):
         self.running = True  # Control flag to stop the process
 
     def run(self):
-        while self.capture.isOpened() and self.running:
-            success, frame = self.capture.read()
-            if not success:
-                break
-            self.output.put(frame)  # Send the frame to the queue
-        self.capture.release()
+        try:
+            while self.capture.isOpened() and self.running:
+                success, frame = self.capture.read()
+                if not success:
+                    break
+                self.output.put(frame)  # Send the frame to the queue    
+                 
+            self.capture.release()
+            
+        finally:
+            self.capture.release()

@@ -5,49 +5,49 @@ import cv2
 import time
 import math
 from multiprocessing import Process
-from cv2 import putText
 
 class GazeDetector(Process):
-    def __init__(self, input_image_queue, output_gaze_queue):
+    def __init__(self, input_image_queue, output_gaze_queue, output_image_queue, is_debug=False):
         super().__init__()  # Initialize the Process class
         self.detector           = AttentionDetector()
         self.calibrator         = AttentionCalibrator()
         self.calib_detector     = None
         self.input_image_queue  = input_image_queue
         self.output_gaze_queue  = output_gaze_queue
+        self.output_image_queue = output_image_queue
         self.running            = True
+        self.is_debug           = True
         
         self.calibrator.start_calibration()
         
     def calibrate(self):
-        print("Starting calibration process...")
+        print("\nStarting calibration process...")
         
         while self.running:
-            frame = self.input_image_queue.get()
-            
-            # Process frame using existing detector
-            frame, attention, sustained, angles, face_found = self.detector.process_frame(frame)
-            
-            if face_found and angles is not None:
-                pitch, yaw, _ = angles
-                is_complete, message = self.calibrator.process_calibration_frame(pitch, yaw)
+            if not self.input_image_queue.empty():
+                frame = self.input_image_queue.get()
                 
-                # Display calibration status
-                putText(frame, message, (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                # Process frame using existing detector
+                frame, attention, sustained, angles, face_found = self.detector.process_frame(frame)
                 
-                if is_complete:
-                    print(f"Calibration complete!")
-                    print(f"Baseline Pitch: {self.calibrator.baseline_pitch:.2f}")
-                    print(f"Baseline Yaw: {self.calibrator.baseline_yaw:.2f}")
-                    print(f"Pitch Threshold: {self.calibrator.pitch_threshold:.2f}")
-                    print(f"Yaw Threshold: {self.calibrator.yaw_threshold:.2f}")
-                    break
-            
-            cv2.imshow('Calibration', frame)
-            if cv2.waitKey(5) & 0xFF == 27:
-                break
-            
-        return self.calibrator
+                if face_found and angles is not None:
+                    pitch, yaw, _ = angles
+                    is_complete, message = self.calibrator.process_calibration_frame(pitch, yaw)
+                
+                    if self.is_debug:                
+                        # Display calibration status
+                        cv2.putText(frame, message, (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        self.output_image_queue.put(frame)
+                        
+                    if is_complete:
+                        print(f"Calibration complete!")
+                        print(f"Baseline Pitch: {self.calibrator.baseline_pitch:.2f}")
+                        print(f"Baseline Yaw: {self.calibrator.baseline_yaw:.2f}")
+                        print(f"Pitch Threshold: {self.calibrator.pitch_threshold:.2f}")
+                        print(f"Yaw Threshold: {self.calibrator.yaw_threshold:.2f}")
+                        break
+        
+        print("\nCalibration process complete")
     
     def calculate_attention_metrics(self, attention_window, interval_duration=3.0):
    
@@ -60,7 +60,6 @@ class GazeDetector(Process):
                 'robot_looks': 0,
                 'non_robot_looks': 0
             }
-            
 
         # Get current time and filter window to only include last interval_duration seconds
         current_time = attention_window[-1][0]  # Latest timestamp
@@ -153,53 +152,51 @@ class GazeDetector(Process):
             print("Calibration failed or was interrupted.")
             return
         
+        print("\nStarting attention detection with calibrated values...")
         self.calib_detector = CalibratedAttentionDetector(self.calibrator)
         
         attention_window = []
         
         while self.running:
-            frame = self.input_image_queue.get()
-            
-            # Process frame
-            frame, attention, sustained, angles, face_found = self.calib_detector.process_frame(frame)
-            
-            # Update attention window
-            current_time = time.time()
-            attention_window.append((current_time, attention))
-            
-            # Remove old entries from attention window (older than 3 seconds)
-            attention_window = [(t, a) for t, a in attention_window if t > current_time - 3]
-            
-            # Calculate metrics
-            metrics = self.calculate_attention_metrics(attention_window)
-        
-            # Update gaze score calculations
-            gaze_score =  self.calculate_gaze_score(metrics, interval_duration=3.0)
-            
-            # Display the frame
-            if face_found:
-                h, w, _ = frame.shape
-                # Add calibration values
-                cv2.putText(frame, f'Baseline Pitch: {self.calibrator.baseline_pitch:.1f}', 
-                        (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                cv2.putText(frame, f'Baseline Yaw: {self.calibrator.baseline_yaw:.1f}', 
-                        (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+            if not self.input_image_queue.empty():
+                frame = self.input_image_queue.get()
                 
-                # Add metrics
-                cv2.putText(frame, f'Attention Ratio: {metrics["attention_ratio"]:.2f}', 
-                        (20, h - 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                cv2.putText(frame, f'Gaze Entropy: {metrics["gaze_entropy"]:.2f}', 
-                        (20, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                cv2.putText(frame, f'Frames in Window: {metrics["frames_in_interval"]}', 
-                        (20, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                # Process frame
+                frame, attention, _, _, face_found = self.calib_detector.process_frame(frame)
+                
+                # Update attention window
+                current_time = time.time()
+                attention_window.append((current_time, attention))
+                
+                # Remove old entries from attention window (older than 3 seconds)
+                attention_window = [(t, a) for t, a in attention_window if t > current_time - 3]
+                
+                # Calculate metrics
+                metrics = self.calculate_attention_metrics(attention_window)
             
-            
-            self.output_gaze_queue.put((current_time, gaze_score))
-            
-            cv2.imshow('Calibrated HRI Attention Detection', frame)
-            
-            # Break loop on 'ESC'
-            if cv2.waitKey(5) & 0xFF == 27:
-                break
+                # Update gaze score calculations
+                gaze_score =  self.calculate_gaze_score(metrics, interval_duration=3.0)
+                
+                # Display the frame
+                if self.is_debug:
+                    if face_found:
+                        h, w, _ = frame.shape
+                        # Add calibration values
+                        cv2.putText(frame, f'Baseline Pitch: {self.calibrator.baseline_pitch:.1f}', 
+                                (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        cv2.putText(frame, f'Baseline Yaw: {self.calibrator.baseline_yaw:.1f}', 
+                                (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        
+                        # Add metrics
+                        cv2.putText(frame, f'Attention Ratio: {metrics["attention_ratio"]:.2f}', 
+                                (20, h - 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        cv2.putText(frame, f'Gaze Entropy: {metrics["gaze_entropy"]:.2f}', 
+                                (20, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        cv2.putText(frame, f'Frames in Window: {metrics["frames_in_interval"]}', 
+                                (20, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                    
+                    self.output_image_queue.put(frame)
+                
+                self.output_gaze_queue.put((current_time, gaze_score))
             
             
