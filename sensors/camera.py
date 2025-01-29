@@ -4,19 +4,19 @@ from multiprocessing import Process, Queue
 class Camera(Process):
     def __init__(self, queue):
         super().__init__()  # Initialize the Process class
-        self.capture = VideoCapture(0)
-        self.output = queue
+        self.capture = None
+        self.queue = queue
         self.running = True  # Control flag to stop the process
 
     def run(self):
-        try:
-            while self.capture.isOpened() and self.running:
-                success, frame = self.capture.read()
-                if not success:
-                    break
-                self.output.put(frame)  # Send the frame to the queue    
-                 
-            self.capture.release()
-            
-        finally:
-            self.capture.release()
+        self.capture = VideoCapture(0)
+
+        while self.running:
+            ret, frame = self.capture.read()
+            if ret:
+                self.queue.put(frame)
+
+        self.capture.release()
+
+    def stop(self):
+        self.running = False  # Signal the process to stop

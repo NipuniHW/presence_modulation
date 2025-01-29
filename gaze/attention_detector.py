@@ -65,10 +65,11 @@ class AttentionDetector:
     def process_frame(self, frame):
         """Process a single frame and return attention state and visualization"""
         h, w, _ = frame.shape
-        
+
         # Convert BGR to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(rgb_frame)
+        print(f"Here")
         
         # Initialize return values
         attention_detected = False
@@ -157,5 +158,4 @@ class AttentionDetector:
                 
                 cv2.line(frame, p1, p2, color, 2)
         
-                        
         return frame, attention_detected, sustained_attention, angles, face_found,

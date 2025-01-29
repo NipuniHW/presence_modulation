@@ -2,7 +2,7 @@ import numpy as np
 import random
 from gaze import main
 import json 
-from connection import Connection
+from pepper.connection import Connection
 from openai import OpenAI
 from dotenv import load_dotenv
 import qi
