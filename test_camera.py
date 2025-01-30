@@ -12,9 +12,11 @@ if __name__ == "__main__":
 
     try:
         while True:
-            if not image_queue.empty():
+            try:
                 frame = image_queue.get_nowait()
                 imshow('Camera Test', frame)
+            except:
+                pass
                 
             # Break the loop on 'ESC'
             if waitKey(1) == ord('q'):
@@ -25,5 +27,4 @@ if __name__ == "__main__":
         
         # Clean up
         worker.terminate()
-
         worker.join()

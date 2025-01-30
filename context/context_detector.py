@@ -62,23 +62,10 @@ class ContextDetector(Process):
 
         return mfccs
 
-    def classify_real_time_audio(self, model, input_shape, sr=16000):
+    def classify_real_time_audio(self, audio_frames, model, input_shape, sr=16000):
         """Function to classify ambient sound"""
-        p = pyaudio.PyAudio()
-        chunk_size = 1024
-        stream = p.open(format=pyaudio.paFloat32,
-                        channels=1,
-                        rate=sr,
-                        input=True,
-                        input_device_index=11,
-                        frames_per_buffer=chunk_size)
+        audio = np.concatenate(audio_frames, axis=0)
 
-        frames = []
-        for i in range(0, int(sr / chunk_size * 3)):  # 3 seconds
-            data = stream.read(chunk_size)
-            frames.append(np.frombuffer(data, dtype=np.float32))
-
-        audio = np.concatenate(frames, axis=0)
         mfccs = self.preprocess_audio(audio, sr=sr, fixed_length=input_shape[1])
         mfccs = mfccs.reshape(1, *input_shape)
 
@@ -93,14 +80,16 @@ class ContextDetector(Process):
             wf.setnchannels(1)
             wf.setsampwidth(p.get_sample_size(pyaudio.paFloat32))
             wf.setframerate(sr)
-            wf.writeframes(b''.join(frames))
+            wf.writeframes(b''.join(audio_frames))
 
         if (class_labels[predicted_class]=='Alarmed'):
             sentiment_confidence = max(confidence, 0.6)
             return predicted_class, sentiment_confidence, class_labels[predicted_class]
+        
         elif (class_labels[predicted_class]=='Social'):
             sentiment_confidence = max(confidence*0.5, 0.3)
             return predicted_class, sentiment_confidence, class_labels[predicted_class]
+        
         elif (class_labels[predicted_class]=='Disengaged'):
             sentiment_confidence = confidence*0.2
             return predicted_class, sentiment_confidence, class_labels[predicted_class]
