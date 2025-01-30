@@ -1,86 +1,89 @@
 from multiprocessing import Queue
 
-from sensors import camera
+from sensors.camera import Camera
+from sensors.audio import Audio
 
-from gaze import gaze_detector
+from gaze.gaze_detector import GazeDetector
+from context.context_detector import ContextDetector
+from learning.synchronizer import PacketSynchronizer
+from learning.learning import PresenceLearner
 
-# global q_table
+import time
+from cv2 import imshow, waitKey, destroyAllWindows
 
-    
-# main_generator = main()  # Initialize the generator from the main function
-# L, M, V = 2, 2, 2  # Initial behavior levels
-# previous_state = None
-# episode_data = []
-# ep_num = 1000
 
 if __name__ == "__main__":
-    
+    # Create a queue for communication
     image_queue = Queue()
-    gaze_queue = Queue()
-    
-    camera_driver = camera.Camera(image_queue)
-    camera_driver.start()
-    
-    gaze = gaze_detector.GazeDetector(image_queue, gaze_queue)
+    audio_queue = Queue()
+
+    gaze_queue          = Queue()
+    gaze_image_queue    = Queue()
+    context_queue       = Queue()
+    synchronized_queue  = Queue()
+
+    # Create and start the worker process
+    camera = Camera(image_queue)
+    camera.start()
+
+    # Create and start the worker process
+    audio = Audio(audio_queue, input_device_index=8)
+    audio.start()
+
+    # Wait for the camera to initialize (avoid GazeDetector running on empty input)
+    print("Waiting for camera to initialize...")
+
+    while image_queue.empty():
+        time.sleep(0.5)  # Give some time for the first frame to be captured
+
+    print("Camera initialized.")
+
+    # Wait for the audio to initialize (avoid ContextDetector running on empty input)
+    print("Waiting for audio to initialize...")
+
+    while image_queue.empty():
+        time.sleep(0.5)  # Give some time for the first frame to be captured
+
+    print("Audio initialized.")
+
+    gaze = GazeDetector(image_queue, gaze_queue, gaze_image_queue, is_debug=True)
     gaze.start()
-    
-    
-    
-    
-    # for episode in range(ep_num):
-    #     print(f"Episode {episode + 1}/1000")
-    #     try:
-    #         # Get the latest gaze score and context from the main generator
-    #         gaze_score, context = next(main_generator)
-                        
-    #         transcription = "Hi Pepper"
-    #         print(f"Received gaze score: {gaze_score}, Context: {context}, Transcription: {transcription}")
 
-    #         # Convert gaze score to gaze bin
-    #         gaze_bin = assign_gaze_bin(gaze_score)
-    #         print(f"Assigned Gaze Bin: {gaze_bin}")
+    context = ContextDetector(audio_queue, context_queue, audio.get_sample_size())
+    context.start()
 
-    #         # Set the initial state or update based on previous state
-    #         if previous_state is None:
-    #             state = (context, gaze_bin, L, M, V)
-    #         else:
-    #             c, g, prev_L, prev_M, prev_V = previous_state
-    #             state = (context, gaze_bin, prev_L, prev_M, prev_V)
+    # Start PacketSynchronizer as a separate process
+    synchronizer = PacketSynchronizer(context_queue, gaze_queue, synchronized_queue, max_error=1.0, deletion_timeout=60.0)
+    synchronizer.start()
 
-    #         print(f"State at learning: {state}")
-        
-    #         next_state = q_learning_episode(context, gaze_score, transcription, state)
-            
-    #         previous_state = next_state
-    #         cn, gb, L, M, V = next_state
-    #         print(f"Next state at learning: {next_state}")
+    while synchronized_queue.empty():
+        time.sleep(0.5)  # Give some time for the first frame to be captured
+    
+    presenceLearner = PresenceLearner(synchronized_queue, "training_data")
+    presenceLearner.start()
+
+    while not presenceLearner.is_complete():
+        if not gaze_image_queue.empty():
+            image_packet = gaze_image_queue.get_nowait()
                 
-    #         step_data = {
-    #                 "state": state,
-    #                 "action": (L, M, V),
-    #                 "reward": get_reward(context, gaze_score),  
-    #                 "next_state": next_state,
-    #                 "gaze_score": gaze_score,
-    #                 "gaze_bin": gaze_bin,
-    #                 "context": context,
-    #         }
-    #         episode_data.append(step_data)
-                
-    #         # Save Q-table at each episode
-    #         save_q_table_episode(q_table, episode)
+            image_time  = image_packet[0]
+            image_frame = image_packet[1]
 
-    #         # Save training data at each episode
-    #         save_training_data(step_data, episode)
+            window_name = f"Camera Image at: {image_time:.2f}"
+            imshow(window_name, image_frame)
+        else:
+            continue
+    else:
+        audio.terminate()
+        camera.terminate()
+        context.terminate()
+        gaze.terminate()
+        synchronizer.terminate()
+        presenceLearner.terminate()
 
-    #         # Periodically save Q-table
-    #         if (episode + 1) % 10 == 0:
-    #             save_q_table_full(q_table)
-
-    #     except Exception as e:
-    #         print(f"Error in episode {episode}: {e}")
-    #         break  # Exit training safely if an error occurs
-
-    # # Save final Q-table and training data after the loop
-    # print("Q-Learning Training Complete.")
-    # save_q_table_full(q_table)
-    # save_training_data(episode_data, ep_num) 
+        audio.join()
+        camera.join()
+        context.join()
+        gaze.join()
+        synchronizer.join()
+        presenceLearner.join()

@@ -16,6 +16,7 @@ if __name__ == "__main__":
 
     # Wait for the camera to initialize (avoid GazeDetector running on empty input)
     print("Waiting for camera to initialize...")
+
     while image_queue.empty():
         time.sleep(0.5)  # Give some time for the first frame to be captured
 
@@ -24,23 +25,31 @@ if __name__ == "__main__":
     
     try:
         while True:
-            # Retrieve and display the camera feed
-            # try:
-            #     frame = image_queue.get_nowait()
-            #     imshow('Camera Input', frame)
-            # except:
-            #     pass  # Skip if no frame is available
-     
-            # Retrieve and display the gaze-calibrated feed
-            try:
-                frame2 = gaze_image_queue.get_nowait()
-                imshow('Gaze Calibration', frame2)
-            except:
-                pass  # Skip if no frame is available
+            if not gaze_image_queue.empty():
+                image_packet = gaze_image_queue.get_nowait()
+                
+                image_time  = image_packet[0]
+                image_frame = image_packet[1]
+
+                window_name = f"Camera Image at: {image_time:.2f}"
+                imshow(window_name, image_frame)
+            else:
+                continue  # Skip if no frame is available
+
+            if not gaze_queue.empty():
+                gaze_packet = gaze_queue.get_nowait()
+                
+                gaze_time  = gaze_packet[0]
+                gaze_score = gaze_packet[1]
+
+                print(f"[{gaze_time}] score : {gaze_score}")
+            else:
+                continue  # Skip if no frame is available
 
             # Break the loop on 'ESC'
             if waitKey(5) == ord('q'):
                 break
+            
     finally:
         print("\nShutting down processes...")
         destroyAllWindows()  # Close all OpenCV windows

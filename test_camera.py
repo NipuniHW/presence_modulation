@@ -13,8 +13,13 @@ if __name__ == "__main__":
     try:
         while True:
             try:
-                frame = image_queue.get_nowait()
-                imshow('Camera Test', frame)
+                packet = image_queue.get_nowait()   # packet is (current_time, frame)
+
+                time_stamp = packet[0]
+                frame      = packet[1]
+
+                window_name = "Camera Image at:" + time_stamp
+                imshow(window_name, frame)
             except:
                 pass
                 

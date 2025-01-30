@@ -40,12 +40,13 @@ class Audio(Process):
         print(f"Audio Stream opened")
 
         while self.running:
+            start_time = time.time()
             audio_frames = []
             for i in range(0, int(self.rate / self.chunk_size * self.sample_duration)):  # 3 seconds
                 data = self.stream.read(self.chunk_size, exception_on_overflow=False)
                 audio_frames.append(np.frombuffer(data, dtype=np.float32))
 
-            self.queue.put(audio_frames)
+            self.queue.put([start_time, audio_frames])
 
         print(f"Audio Stream closing")
         self.stream.stop_stream()

@@ -30,38 +30,43 @@ class GazeDetector(Process):
         
         while self.running:
             try:
-                frame = self.input_image_queue.get_nowait()
-            except Empty:
-                continue
-            
-            print(f"Got photo1")
-            # Process frame using existing detector
-            frame, _, _, angles, face_found = self.detector.process_frame(frame)
-            print(f"Got photo2")
+                packet = self.input_image_queue.get_nowait()
 
-            if not face_found:
-                print("No face detected in frame")
-                continue  # Skip processing if no face is found
-                
-            if face_found and angles is not None:
-                print(f"Got face")
-                pitch, yaw, _ = angles
-                is_complete, message = self.calibrator.process_calibration_frame(pitch, yaw)
-                
-                if self.is_debug:                
-                    # Display calibration status
-                    cv2.putText(frame, message, (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                    self.output_image_queue.put(frame)
-                        
-                    if is_complete:
-                        print(f"Calibration complete!")
-                        print(f"Baseline Pitch: {self.calibrator.baseline_pitch:.2f}")
-                        print(f"Baseline Yaw: {self.calibrator.baseline_yaw:.2f}")
-                        print(f"Pitch Threshold: {self.calibrator.pitch_threshold:.2f}")
-                        print(f"Yaw Threshold: {self.calibrator.yaw_threshold:.2f}")
-                        break
-            else:
-                self.output_image_queue.put(frame)
+                time_stamp = packet[0]
+                frame      = packet[1]
+
+                print(f"Got photo1")
+
+                # Process frame using existing detector
+                frame, _, _, angles, face_found = self.detector.process_frame(frame)
+                print(f"Got photo2")
+
+                if not face_found:
+                    print("No face detected in frame")
+                    continue  # Skip processing if no face is found
+                    
+                if face_found and angles is not None:
+                    print(f"Got face")
+                    pitch, yaw, _ = angles
+                    is_complete, message = self.calibrator.process_calibration_frame(pitch, yaw)
+                    
+                    if self.is_debug:                
+                        # Display calibration status
+                        cv2.putText(frame, message, (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        self.output_image_queue.put([time_stamp, frame])
+                            
+                        if is_complete:
+                            print(f"Calibration complete!")
+                            print(f"Baseline Pitch: {self.calibrator.baseline_pitch:.2f}")
+                            print(f"Baseline Yaw: {self.calibrator.baseline_yaw:.2f}")
+                            print(f"Pitch Threshold: {self.calibrator.pitch_threshold:.2f}")
+                            print(f"Yaw Threshold: {self.calibrator.yaw_threshold:.2f}")
+                            break
+                else:
+                    self.output_image_queue.put([time_stamp, frame])
+
+            except Empty:
+                pass
         
         print("\nCalibration process complete")
     
@@ -179,46 +184,51 @@ class GazeDetector(Process):
         
         while self.running:
             try:
-                frame = self.input_image_queue.get_nowait()
+                packet = self.input_image_queue.get_nowait()
+
+                time_stamp = packet[0]
+                frame      = packet[1]
+                            
+                # Process frame
+                frame, attention, _, _, face_found = self.calib_detector.process_frame(frame)
+                    
+                # Update attention window
+                attention_window.append((time_stamp, attention))
+                    
+                # Remove old entries from attention window (older than 3 seconds)
+                attention_window = [(t, a) for t, a in attention_window if t > time_stamp - 3]
+                    
+                # Calculate metrics
+                metrics = self.calculate_attention_metrics(attention_window)
+                
+                # Update gaze score calculations
+                gaze_score =  self.calculate_gaze_score(metrics, interval_duration=3.0)
+                    
+                # Display the frame
+                if self.is_debug:
+                    if face_found:
+                        h, w, _ = frame.shape
+                        # Add calibration values
+                        cv2.putText(frame, f'Baseline Pitch: {self.calibrator.baseline_pitch:.1f}', 
+                                    (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        cv2.putText(frame, f'Baseline Yaw: {self.calibrator.baseline_yaw:.1f}', 
+                                    (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                            
+                        # Add metrics
+                        cv2.putText(frame, f'Attention Ratio: {metrics["attention_ratio"]:.2f}', 
+                                    (20, h - 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        cv2.putText(frame, f'Gaze Entropy: {metrics["gaze_entropy"]:.2f}', 
+                                    (20, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        cv2.putText(frame, f'Frames in Window: {metrics["frames_in_interval"]}', 
+                                    (20, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
+                        
+                    self.output_image_queue.put([time_stamp, frame])
+                    
+                self.output_gaze_queue.put([time_stamp, gaze_score])
+
             except Empty:
                 continue  # Skip iteration if no frame is available
                 
-            # Process frame
-            frame, attention, _, _, face_found = self.calib_detector.process_frame(frame)
-                
-            # Update attention window
-            current_time = time.time()
-            attention_window.append((current_time, attention))
-                
-            # Remove old entries from attention window (older than 3 seconds)
-            attention_window = [(t, a) for t, a in attention_window if t > current_time - 3]
-                
-            # Calculate metrics
-            metrics = self.calculate_attention_metrics(attention_window)
-            
-            # Update gaze score calculations
-            gaze_score =  self.calculate_gaze_score(metrics, interval_duration=3.0)
-                
-            # Display the frame
-            if self.is_debug:
-                if face_found:
-                    h, w, _ = frame.shape
-                    # Add calibration values
-                    cv2.putText(frame, f'Baseline Pitch: {self.calibrator.baseline_pitch:.1f}', 
-                                (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                    cv2.putText(frame, f'Baseline Yaw: {self.calibrator.baseline_yaw:.1f}', 
-                                (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                        
-                    # Add metrics
-                    cv2.putText(frame, f'Attention Ratio: {metrics["attention_ratio"]:.2f}', 
-                                (20, h - 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                    cv2.putText(frame, f'Gaze Entropy: {metrics["gaze_entropy"]:.2f}', 
-                                (20, h - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                    cv2.putText(frame, f'Frames in Window: {metrics["frames_in_interval"]}', 
-                                (20, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)
-                    
-                self.output_image_queue.put(frame)
-                
-            self.output_gaze_queue.put((current_time, gaze_score))
+
             
             

@@ -1,33 +1,14 @@
-# MIT License
-# 
-# Copyright (c) [2024] Modulate Presence
-# 
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-# 
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-# 
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-#Import library
 import qi
 
-class Connection:
+class Pepper:
     def __init__(self):
-        self.session = qi.Session()
 
-    def connect(self, ip, port):
+        self.session          = qi.Session()
+        self.behavior_service = None
+        self.tts_service      = None
+        self.led_service      = None
+
+    def connect(self, ip='localhost', port='36383'):
         print("Connecting to the robot...")
 
         try:
@@ -38,5 +19,30 @@ class Connection:
         except Exception as e:
             print("Could not connect to Pepper:", e)
             exit(1)
-            
 
+    def setup_behaviour_manager_service(self):
+        self.behavior_service = self.session.service("ALBehaviorManager")
+        print("Connected to ALBehaviorManager")
+
+    def setup_text_to_speech_service(self):
+        self.tts_service = self.session.service("ALTextToSpeech")
+        print("Connected to ALTextToSpeech")
+
+    def setup_led_service(self):
+        self.led_service = self.session.service("ALLeds")
+        print("Connected to ALLeds")
+
+    def trigger_led_intensity(self, value):
+        self.led_service.setIntensity("Face/Led/Blue/Left/225Deg/Actuator/Value", value)
+        self.led_service.setIntensity("Face/Led/Blue/Left/270Deg/Actuator/Value", value)            
+        self.led_service.setIntensity("Face/Led/Green/Left/225Deg/Actuator/Value", value)
+        self.led_service.setIntensity("Face/Led/Green/Left/270Deg/Actuator/Value", value)
+        self.led_service.setIntensity("Face/Led/Red/Left/270Deg/Actuator/Value", value)
+
+    def trigger_movement(self, action):
+        self.behavior_service.stopAllBehaviors()
+        self.behavior_service.startBehavior("modulated_actions/" + str(action)) 
+
+    def trigger_text_to_speech(self, volume, text):
+        self.tts_service.setVolume(volume)
+        self.tts_service.say(text)

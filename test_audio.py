@@ -15,8 +15,12 @@ if __name__ == "__main__":
     try:
         while True:
             try:
-                frames = audio_queue.get_nowait()
-                print(f"Received audio data of length {len(frames)}")
+                packet = audio_queue.get_nowait()
+
+                time_stamp = packet[0]
+                frames      = packet[1]
+
+                print(f"[{time_stamp}] audio data of length : {len(frames)}")
             except:
                 pass
 

@@ -1,5 +1,6 @@
 from cv2 import VideoCapture, imshow, waitKey, destroyAllWindows
-from multiprocessing import Process, Queue
+from multiprocessing import Process
+import time
 
 class Camera(Process):
     def __init__(self, queue):
@@ -12,9 +13,10 @@ class Camera(Process):
         self.capture = VideoCapture(0)
 
         while self.running:
+            current_time = time.time()
             ret, frame = self.capture.read()
             if ret:
-                self.queue.put(frame)
+                self.queue.put([current_time, frame])
 
         self.capture.release()
 
