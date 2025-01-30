@@ -21,4 +21,5 @@ services:
               count: all
               capabilities: [gpu]
 
-    command: ["python", "-u", "test_camera.py"]
+    # command: ["python3", "-u", "test_camera.py"]
+    command: ["python3", "-u", "test_audio.py"]
