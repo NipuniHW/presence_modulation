@@ -6,7 +6,7 @@ from sensors.audio import Audio
 from gaze.gaze_detector import GazeDetector
 from context.context_detector import ContextDetector
 from learning.synchronizer import PacketSynchronizer
-from learning.learning import PresenceLearner
+from learning.learning_gaze_context import PresenceLearner
 
 import time
 from cv2 import imshow, waitKey, destroyAllWindows

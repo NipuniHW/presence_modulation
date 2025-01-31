@@ -18,7 +18,7 @@ if __name__ == "__main__":
                 time_stamp = packet[0]
                 frame      = packet[1]
 
-                window_name = "Camera Image at:" + time_stamp
+                window_name = f"Camera Image " #at: {time_stamp:.2f}"
                 imshow(window_name, frame)
             except:
                 pass
@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     finally:
         destroyAllWindows()  # Close all OpenCV windows
-        
+
         # Clean up
         worker.terminate()
         worker.join()

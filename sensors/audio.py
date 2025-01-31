@@ -10,7 +10,7 @@ class Audio(Process):
                  channels=1, 
                  rate=16000, 
                  input=True, 
-                 input_device_index=11, 
+                 input_device_index=13, 
                  sample_duration=3):
         
         super().__init__()

@@ -11,7 +11,8 @@ if __name__ == "__main__":
     context_queue = Queue()
 
     # Create and start the worker process
-    worker = Audio(audio_queue, input_device_index=8)
+#    worker = Audio(audio_queue, input_device_index=8)
+    worker = Audio(audio_queue, input_device_index=13)
     worker.start()
 
     context = ContextDetector(audio_queue, context_queue, worker.get_sample_size())

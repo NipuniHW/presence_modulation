@@ -9,7 +9,8 @@ if __name__ == "__main__":
     audio_queue = Queue()
 
     # Create and start the worker process
-    worker = Audio(audio_queue, input_device_index=8)
+#    worker = Audio(audio_queue, input_device_index=8)
+    worker = Audio(audio_queue, input_device_index=11)
     worker.start()
 
     try:

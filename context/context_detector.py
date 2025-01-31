@@ -24,7 +24,7 @@ class ContextDetector(Process):
                  channels=1,
                  rate=16000,
                  sound_model_path="model/emergency_model.h5",
-                 state_model_path="model/efinal_NB_model.joblib"):
+                 state_model_path="model/final_NB_model.joblib"):
         
         super().__init__()
         self.input_queue  = input_queue
@@ -189,6 +189,7 @@ class ContextDetector(Process):
 
                  # Step 1: Record and classify ambient sound
                 _, ambient_conf, ambient_label = self.classify_real_time_audio(audio_frames, self.model, self.input_shape, sr=self.rate)
+                print(f"Ambient classification completed", ambient_conf, ambient_label)
 
                 # Step 2: Process speech-to-text and sentiment analysis
                 _, sentiment_conf, keyword_conf, speech_label, transcription_text = self.process_speech_to_text_and_sentiment()
