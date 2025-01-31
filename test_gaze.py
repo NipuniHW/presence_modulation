@@ -31,8 +31,9 @@ if __name__ == "__main__":
                 image_time  = image_packet[0]
                 image_frame = image_packet[1]
 
-                window_name = f"Camera Image at: {image_time:.2f}"
-                imshow(window_name, image_frame)
+                imshow("Camera Image", image_frame)
+                print(f"[{image_time}] Image received")
+
             else:
                 continue  # Skip if no frame is available
 

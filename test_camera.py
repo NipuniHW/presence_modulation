@@ -18,8 +18,8 @@ if __name__ == "__main__":
                 time_stamp = packet[0]
                 frame      = packet[1]
 
-                window_name = f"Camera Image " #at: {time_stamp:.2f}"
-                imshow(window_name, frame)
+                imshow("Camera Image", frame)
+                print(f"[{time_stamp}] received Image")
             except:
                 pass
                 
